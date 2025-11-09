@@ -12,10 +12,10 @@ class InkMode(Enum):
     STRING_EVALUATION_MODE = 2
     
 
-class LabelMarker():
+class LabelMarker:
     """Used in flattening JSON files to handle nested lists."""
-    def __init__(this,l):
-        this.label = l
+    def __init__(self, l):
+        self.label = l
 
 
 class Compiler:
@@ -32,29 +32,29 @@ class Compiler:
 
     """
 
-    def __init__(this):
-        this.ink_globals = []
-        this.ink_functions = dict()
-        this.string_evaluation_no = 0
+    def __init__(self):
+        self.ink_globals = []
+        self.ink_functions = dict()
+        self.string_evaluation_no = 0
         
-    def doListDefs(this, listDefs):
+    def compile_list_defs(self, listdefs):
         """Goes through the listDefs entry at the root. 'lists' in Ink are actually
         sets of named enums."""
-        this.raw_listdefs = listDefs
-        this.ike_ordinal = 0
+        self.raw_listdefs = listdefs
+        self.ike_ordinal = 0
         # Assign a unique ordinal to each enum value of any type, because
         # in Ink they can be blended
-        this.ike_value_ordinals = dict()
-        this.iked_value_ordinals = dict()
-        for (l,d) in listDefs.items():
-            this.ink_globals.append(l)
+        self.ike_value_ordinals = dict()
+        self.iked_value_ordinals = dict()
+        for (l,d) in listdefs.items():
+            self.ink_globals.append(l)
             for value in (d.keys()):
-                this.ike_value_ordinals[value] = this.ike_ordinal
-                this.iked_value_ordinals[l+"."+value] = this.ike_ordinal
-                this.ike_ordinal += 1
+                self.ike_value_ordinals[value] = self.ike_ordinal
+                self.iked_value_ordinals[l + "." + value] = self.ike_ordinal
+                self.ike_ordinal += 1
 
 
-    def label_flatten(this,ic):
+    def label_flatten(self, ic):
         """Occasionally a list container will have a sub-list inside it.
         There's no listed semantics for this, so I assume it just runs
         straight on, but potentially has #f and #n members."""
@@ -64,7 +64,7 @@ class Compiler:
         for item in ic:
             anon_inner_index += 1
             if isinstance(item, list):
-                sublist = this.label_flatten(item)[:-1]
+                sublist = self.label_flatten(item)[:-1]
                 if (item[-1]) is not None:
                     if (item[-1].get("#n")) is not None:
                         out.append(LabelMarker(item[-1].get("#n")))
@@ -77,17 +77,15 @@ class Compiler:
             
         return out
         
-    def doList(this, ic, c_name):
+    def compile_list(self, ic, c_name):
         stack = UnderflowableStack()
         code = Codeblock()
         active_globals = []
         active_locals = []
-        nested_list_no = 0
-        c = this.label_flatten(ic)
+        c = self.label_flatten(ic)
         trivial_sem_length = None
         trivial_sem_string = None
-        trivial_in_sem = False
-        
+
         mode = InkMode.CONTENT_MODE
         for item in c:
             trivial_in_sem= False
@@ -103,7 +101,7 @@ class Compiler:
                 #nested_list_no += 1
 
             elif isinstance(item, LabelMarker):
-                code.add("label "+item.label+":")
+                code.add("label "+c_name+"__"+item.label+":")
                 
             elif isinstance(item, str):
                 
@@ -121,7 +119,7 @@ class Compiler:
                         trivial_in_sem = True
                         if trivial_sem_length is not None:
                             trivial_sem_string += item[1:]
-                        code.add("_seml"+str(this.string_evaluation_no)+".append(\"",item[1:],"\")")
+                        code.add("_seml" + str(self.string_evaluation_no) + ".append(\"", item[1:], "\")")
 
                 # Number (encoded as a string by JSON)
                 elif item.isdigit():
@@ -136,7 +134,7 @@ class Compiler:
                         trivial_in_sem = True
                         if trivial_sem_length is not None:
                             trivial_sem_string += str(item[1:])
-                        code.add("_seml"+str(this.string_evaluation_no)+".append(\"",item[1:],"\")")
+                        code.add("_seml" + str(self.string_evaluation_no) + ".append(\"", item[1:], "\")")
 
                 # No-op        
                 elif item == "\n":
@@ -154,7 +152,7 @@ class Compiler:
                 elif item == "out":
                     # If in stringbuilder mode, append to string
                     if mode == InkMode.STRING_EVALUATION_MODE:
-                        code.add("_seml"+str(this.string_evaluation_no)+".append("+str(stack.pop())+")")
+                        code.add("_seml" + str(self.string_evaluation_no) + ".append(" + str(stack.pop()) + ")")
                     else:
                         # In evaluation mode, output from stack
                         code.add("say",stack.pop())
@@ -178,7 +176,7 @@ class Compiler:
                 # Enter string mode
                 elif item == "str":
                     mode = InkMode.STRING_EVALUATION_MODE
-                    code.add("_seml"+str(this.string_evaluation_no)+" = []")
+                    code.add("_seml" + str(self.string_evaluation_no) + " = []")
                     trivial_sem_length = 0
                     trivial_sem_string = ""
                     trivial_in_sem = True
@@ -186,9 +184,9 @@ class Compiler:
                 # End stringbuilder mode
                 elif item == "/str":
                     mode = InkMode.LOGICAL_EVALUATION_MODE
-                    if (trivial_sem_length is None):
-                        stack.push("\"\".join(_seml"+str(this.string_evaluation_no)+")")
-                        this.string_evaluation_no += 1
+                    if trivial_sem_length is None:
+                        stack.push("\"\".join(_seml" + str(self.string_evaluation_no) + ")")
+                        self.string_evaluation_no += 1
                     else:
                         code.code = code.code[::-trivial_sem_length]
                         code.add("# "+str(trivial_sem_length)+" trivial sem lines compressed")
@@ -282,14 +280,14 @@ class Compiler:
 
                         
                 elif ("f()" in item) or ("->t->" in item):
-                    if ("f()" in item):
+                    if "f()" in item:
                         funcname = item["f()"]
                     else:
                         funcname = item["->t->"]
-                    if (funcname not in this.ink_functions):
+                    if funcname not in self.ink_functions:
                         print("Call to unknown function",funcname)
                     else:
-                        arity = this.ink_functions[funcname]
+                        arity = self.ink_functions[funcname]
                         code.add("call ",funcname,"(",(",".join([stack.pop() for _ in range(arity)]))+")")
                                             
                 elif "x()" in item:
@@ -299,15 +297,15 @@ class Compiler:
                     if "origins" in item:
                         stack.push("# List with origins " + str(item["origins"]))
                     else:
-                        rset = [str(this.iked_value_ordinals[x]) for x in item["list"].keys()]
+                        rset = [str(self.iked_value_ordinals[x]) for x in item["list"].keys()]
                         stack.push("["+",".join(rset)+"]")
                     
                 elif "VAR=" in item:
                     varname = item["VAR="]
                     code.add(varname,"=",stack.pop())   # Global?
-                    if (varname not in this.ink_globals):
-                        this.ink_globals.append(varname)
-                    if (varname not in active_globals):
+                    if varname not in self.ink_globals:
+                        self.ink_globals.append(varname)
+                    if varname not in active_globals:
                         active_globals.append(varname)
                         code.prepend("global ",varname)
                 elif "temp=" in item:
@@ -315,19 +313,19 @@ class Compiler:
                     active_locals.append(item["temp="])
                 elif "VAR?" in item:
                     varname = item["VAR?"]
-                    if (varname in active_locals):
+                    if varname in active_locals:
                         varexp = varname
-                    elif (varname in this.ike_value_ordinals):
-                        varexp = str(this.ike_value_ordinals[varname])
+                    elif varname in self.ike_value_ordinals:
+                        varexp = str(self.ike_value_ordinals[varname])
                     else:
-                        if (varname not in active_globals):
+                        if varname not in active_globals:
                             active_globals.append(varname)
                             code.prepend("global ",varname)
                         varexp = varname
                 
-                    if (mode == InkMode.CONTENT_MODE):
+                    if mode == InkMode.CONTENT_MODE:
                         code.add("say " + varexp)
-                    elif (mode == InkMode.LOGICAL_EVALUATION_MODE):
+                    elif mode == InkMode.LOGICAL_EVALUATION_MODE:
                         stack.push(varexp)
                     else:
                         assert mode == InkMode.STRING_EVALUATION_MODE
@@ -337,14 +335,14 @@ class Compiler:
                     print("Get reference count of:",item["CNT?"])
                 elif "*" in item:
                     flags = item["flg"]
-                    if (flags & 1):
+                    if flags & 1:
                         code.add("if ",stack.pop(),":")
                         code.start_block()
                     start = stack.pop() if (flags & 2) else "None"
                     content = stack.pop() if (flags & 4) else "None"
                     code.add("inkl_choicepoint("+start+","+content+","+item["*"]+")")
                     
-                    if (flags & 1):
+                    if flags & 1:
                         code.end_block()
                     
                 elif "^var" in item:
@@ -356,7 +354,7 @@ class Compiler:
                     print("Probably packed content dict!")
                     print(item)
                     for k in item.keys():
-                        this.doContainer(item, k, c_name)
+                        self.compile_container(item[k], c_name)
             elif isinstance(item, int):
                 if mode == 0:
                     code.add("say \"",str(item),"\"")
@@ -373,31 +371,31 @@ class Compiler:
                     trivial_sem_length = None
                 
                 
-        return (stack,code)
+        return stack,code
 
 
-    def doContainer(this, c, path):
+    def compile_container(self, c, path):
 
         real_name = path
          
         # Sometimes in a subcontainer dict, a "container" is just one
         # value. Convert it to a list for ease of parsing.
-        if (not isinstance(c,list)):
+        if not isinstance(c, list):
             c = [c]
         else:
             # The last member of a list container is meant to be either
             # None, or a dict of subcontainers.
             endm = c.pop()  
-            if (isinstance(endm,dict)):
-                if ("#n" in endm):
-                    real_name = path + "_" + endm["#n"]
+            if isinstance(endm, dict):
+                if "#n" in endm:
+                    real_name = path + "__" + endm["#n"]
                     del endm["#n"]
-                if ("#f" in endm):
+                if "#f" in endm:
                     flags = endm["#f"]
                     del endm["#f"]
                 for subContainer in endm.keys():
-                    this.doContainer(endm[subContainer],real_name + "_" + subContainer)
-            elif (endm is not None):
+                    self.compile_container(endm[subContainer], real_name + "_" + subContainer)
+            elif endm is not None:
                 print("?? SPEC: Bad container end sentinel",endm)
 
         # Just to confuse everyone, occasionally a sublist will show up
@@ -408,17 +406,17 @@ class Compiler:
 
         for lc in c:
             anon_inner_index += 1
-            if (isinstance(lc,list)):
+            if isinstance(lc, list):
                 lcend = lc[-1]
-                inner_name = real_name + "_" + str(anon_inner_index)
-                if (isinstance(lcend,dict)):
-                    if ("#n" in lcend):
+                inner_name = real_name + "__" + str(anon_inner_index)
+                if isinstance(lcend, dict):
+                    if "#n" in lcend:
                         inner_name = real_name + "_" + lcend["#n"]
                     for subContainer in lcend.keys():
                         if (subContainer != "#f") and (subContainer != "#n"):
-                            this.doContainer(lcend[subContainer],inner_name + "_" + subContainer)
+                            self.compile_container(lcend[subContainer], inner_name + "_" + subContainer)
 
-        (stack,code) = this.doList(c,real_name)
+        (stack,code) = self.compile_list(c, real_name)
         # Things were left on stack, probably returns
         
 #        if (stack.depth() > 0):
@@ -429,13 +427,13 @@ class Compiler:
 
         code.wrap("label " + real_name + "(" + ",".join(varins) + "):")
         code.dump()
-        this.ink_functions[real_name] = stack.nextvarin
+        self.ink_functions[real_name] = stack.nextvarin
         
 
-    def compile(this,j):
+    def compile(self, j):
         if "listDefs" in j:
-            this.doListDefs(j["listDefs"])
-        this.doContainer(j["root"],"")
+            self.compile_list_defs(j["listDefs"])
+        self.compile_container(j["root"], "")
         
     
         

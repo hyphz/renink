@@ -1,45 +1,48 @@
+from typing import Iterable
+
+
 class Codeblock:
     """A block of Python/Ren'py code for output."""
 
-    def __init__(this):
-        this.code = []
-        this.indent_level = 0
+    def __init__(self):
+        self.code = []
+        self.indent_level = 0
 
-    def add(this, *args:list[str]):
+    def add(self, *args:Iterable[str]):
         """Add the code as a single statement to the block."""
         ins = "".join(args)
-        ins = ("\t"*this.indent_level) + ins
-        this.code.append(ins)
+        ins = ("\t" * self.indent_level) + ins
+        self.code.append(ins)
 
-    def start_block(this):
+    def start_block(self):
         """Start an indented block."""
-        this.indent_level += 1
+        self.indent_level += 1
 
-    def end_block(this):
+    def end_block(self):
         """End an indented block."""
-        this.indent_level -= 1
+        self.indent_level -= 1
 
-    def retro_indent(this):
+    def retro_indent(self):
         """Retroactively indent all code in this block."""
-        this.code = ["\t"+x for x in this.code]
+        self.code = ["\t" + x for x in self.code]
 
-    def wrap(this, *args:list[str]):
+    def wrap(self, *args:Iterable[str]):
         """Place the given code at the top of the block, with everything else indented beneath it."""
         ins = "".join(args)
-        ins = ("\t"*this.indent_level) + ins
-        this.retro_indent()
-        this.code.insert(0,ins)
+        ins = ("\t" * self.indent_level) + ins
+        self.retro_indent()
+        self.code.insert(0, ins)
 
-    def prepend(this, *args:list[str]):
+    def prepend(self, *args:Iterable[str]):
         """Place the given code at the top of the block."""
         ins = "".join(args)
-        ins = ("\t"*this.indent_level) + ins
-        this.code.insert(0,ins)
+        ins = ("\t" * self.indent_level) + ins
+        self.code.insert(0, ins)
 
-    def dump(this):
+    def dump(self):
         """Output the block."""
-        for line in this.code:
+        for line in self.code:
             print(line)
 
-    def concat(this,rest):
-        this.code = this.code + rest.code
+    def concat(self, rest):
+        self.code = self.code + rest.code
